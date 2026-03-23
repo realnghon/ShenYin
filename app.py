@@ -102,7 +102,7 @@ def import_key():
     return jsonify(
         {
             "ok": True,
-            "message": "密钥已导入本地工具。",
+            "message": "凭据已导入本地工具。",
             "saved": saved,
             "keys": KEY_STORE.list_all(),
         }
@@ -119,7 +119,7 @@ def generate_key():
     try:
         key_size = int(request.form.get("key_size", "3072"))
     except ValueError:
-        return json_error("密钥位数无效。")
+        return json_error("凭据位数无效。")
 
     try:
         key = generate_rsa_key(
@@ -137,7 +137,7 @@ def generate_key():
     return jsonify(
         {
             "ok": True,
-            "message": "新的 RSA PGP 密钥对已生成并保存。",
+            "message": "新的凭据对已生成并保存。",
             "fingerprint": fingerprint,
             "downloads": {
                 "public": url_for("download_key", kind="public", fingerprint=fingerprint),
@@ -171,7 +171,7 @@ def delete_key(kind: str, fingerprint: str):
     except KeyStoreError as exc:
         return json_error(str(exc), 404)
 
-    return jsonify({"ok": True, "message": "密钥已删除。", "keys": KEY_STORE.list_all()})
+    return jsonify({"ok": True, "message": "凭据已删除。", "keys": KEY_STORE.list_all()})
 
 
 @app.post("/api/encrypt")
@@ -298,7 +298,7 @@ def download_result(token: str):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Local PGP Workbench")
+    parser = argparse.ArgumentParser(description="ShenYin - Local Data Workspace")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")

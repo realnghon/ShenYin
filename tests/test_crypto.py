@@ -17,7 +17,8 @@ class CryptoTests(unittest.TestCase):
         )
 
         self.assertEqual(encrypted.kind, "text")
-        self.assertIn("BEGIN PGP MESSAGE", encrypted.inline_text)
+        self.assertNotIn("BEGIN PGP MESSAGE", encrypted.inline_text)
+        self.assertTrue(all(32 <= ord(c) <= 126 or c in "\r\n" for c in encrypted.inline_text))
 
         decrypted = decrypt_content(
             mode="symmetric",
@@ -77,7 +78,7 @@ class CryptoTests(unittest.TestCase):
 
         self.assertEqual(decrypted.inline_text, "hello public key")
 
-    def test_symmetric_file_to_armored_text_roundtrip(self):
+    def test_symmetric_file_to_text_roundtrip(self):
         encrypted = encrypt_content(
             input_type="file",
             mode="symmetric",
@@ -89,7 +90,7 @@ class CryptoTests(unittest.TestCase):
         )
 
         self.assertEqual(encrypted.kind, "text")
-        self.assertIn("BEGIN PGP MESSAGE", encrypted.inline_text)
+        self.assertNotIn("BEGIN PGP MESSAGE", encrypted.inline_text)
 
         decrypted = decrypt_content(
             mode="symmetric",

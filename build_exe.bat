@@ -6,9 +6,9 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-tasklist /FI "IMAGENAME eq local-workspace.exe" | find /I "local-workspace.exe" >nul
+tasklist /FI "IMAGENAME eq ShenYin.exe" | find /I "ShenYin.exe" >nul
 if not errorlevel 1 (
-  echo dist\local-workspace.exe is running. Close it before rebuilding.
+  echo dist\ShenYin.exe is running. Close it before rebuilding.
   exit /b 1
 )
 

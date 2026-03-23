@@ -7,7 +7,7 @@ from pgpy.constants import CompressionAlgorithm, HashAlgorithm, KeyFlags, PubKey
 from werkzeug.utils import secure_filename
 
 from pgpbox.gpg_engine import GpgError, decrypt_bytes, encrypt_bytes
-from pgpbox.transport import normalize_transport_blob
+from pgpbox.transport import encode_text_output, normalize_transport_blob
 
 
 class CryptoError(ValueError):
@@ -45,11 +45,11 @@ def generate_rsa_key(
     key_size: int,
 ) -> PGPKey:
     if not name:
-        raise CryptoError("生成密钥时必须填写姓名。")
+        raise CryptoError("生成凭据时必须填写姓名。")
     if not email:
-        raise CryptoError("生成密钥时必须填写邮箱。")
+        raise CryptoError("生成凭据时必须填写邮箱。")
     if key_size not in {2048, 3072, 4096}:
-        raise CryptoError("密钥位数仅支持 2048 / 3072 / 4096。")
+        raise CryptoError("凭据位数仅支持 2048 / 3072 / 4096。")
 
     key = PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, key_size)
     uid = PGPUID.new(name, comment=comment, email=email)
@@ -76,9 +76,9 @@ def generate_rsa_key(
     return key
 
 
-def _download_name(input_type: str, source_name: str | None, armor: bool) -> str:
+def _download_name(input_type: str, source_name: str | None, text_mode: bool) -> str:
     base_name = source_name if input_type == "file" and source_name else "message"
-    extension = "asc" if armor else "pgp"
+    extension = "txt" if text_mode else "bin"
     return f"{base_name}.{extension}"
 
 
@@ -118,7 +118,7 @@ def encrypt_content(
     try:
         output_bytes = encrypt_bytes(
             payload=payload,
-            armor=armor,
+            armor=False,
             compression_name=compression_name,
             mode=mode,
             passphrase=passphrase,
@@ -129,16 +129,24 @@ def encrypt_content(
     except GpgError as exc:
         raise CryptoError(f"加密失败：{exc}") from exc
 
-    filename = _download_name(input_type, source_name, armor)
-    mime_type = "text/plain; charset=utf-8" if armor else "application/octet-stream"
-    inline_text = output_bytes.decode("utf-8") if armor else None
+    if armor:
+        inline_text = encode_text_output(output_bytes)
+        text_bytes = inline_text.encode("utf-8")
+        filename = _download_name(input_type, source_name, True)
+        return CryptoResult(
+            kind="text",
+            filename=filename,
+            content=text_bytes,
+            mime_type="text/plain; charset=utf-8",
+            inline_text=inline_text,
+        )
 
+    filename = _download_name(input_type, source_name, False)
     return CryptoResult(
-        kind="text" if inline_text is not None else "download",
+        kind="download",
         filename=filename,
         content=output_bytes,
-        mime_type=mime_type,
-        inline_text=inline_text,
+        mime_type="application/octet-stream",
     )
 
 

@@ -117,7 +117,7 @@ function renderKeyLists() {
     const items = state.keys[kind];
 
     if (!items.length) {
-      mount.innerHTML = '<div class="result-empty">当前没有保存的密钥。</div>';
+      mount.innerHTML = '<div class="result-empty">当前没有保存的凭据。</div>';
       continue;
     }
 
@@ -387,7 +387,7 @@ function bindKeyForms() {
 
   generateForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    renderMessage(feedback, "notice", "正在生成密钥，这一步会比普通操作稍慢。");
+    renderMessage(feedback, "notice", "正在生成凭据，这一步会比普通操作稍慢。");
     try {
       const data = await submitForm(generateForm, "/api/keys/generate");
       feedback.innerHTML = `
@@ -407,7 +407,7 @@ function bindKeyForms() {
 
   importForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    renderMessage(feedback, "notice", "正在导入密钥。");
+    renderMessage(feedback, "notice", "正在导入凭据。");
     try {
       const data = await submitForm(importForm, "/api/keys/import");
       const lines = data.saved.map((item) => `${item.kind}: ${item.label} | ${item.key_id}`);
@@ -424,7 +424,7 @@ function bindGlobalEvents() {
     const deleteButton = event.target.closest("[data-delete-key]");
     if (deleteButton) {
       const [kind, fingerprint] = deleteButton.dataset.deleteKey.split(":");
-      if (!window.confirm("确认删除这个密钥吗？")) {
+      if (!window.confirm("确认删除这个凭据吗？")) {
         return;
       }
       try {
@@ -458,6 +458,16 @@ async function init() {
   bindToolForm("#decrypt-form", "/api/decrypt", "#decrypt-result");
   bindKeyForms();
   bindGlobalEvents();
+
+  const keyBody = qs("#key-body");
+  const keyBtn = qs("#key-collapse-btn");
+  if (keyBody && keyBtn) {
+    qs("#key-toggle").addEventListener("click", () => {
+      const isHidden = keyBody.classList.toggle("hidden");
+      keyBtn.textContent = isHidden ? "展开" : "收起";
+    });
+  }
+
   try {
     await fetchKeys();
   } catch (error) {

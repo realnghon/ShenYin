@@ -58,7 +58,7 @@ class AppTests(unittest.TestCase):
         decrypted = decrypt.get_json()
         self.assertEqual(decrypted["result"]["text"], "hello flow")
 
-    def test_text_encrypt_defaults_to_armored_text(self):
+    def test_text_encrypt_no_pgp_markers(self):
         response = self.client.post(
             "/api/encrypt",
             data={
@@ -72,9 +72,11 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["ok"])
-        self.assertIn("BEGIN PGP MESSAGE", payload["result"]["text"])
+        text = payload["result"]["text"]
+        self.assertNotIn("BEGIN PGP MESSAGE", text)
+        self.assertTrue(all(32 <= ord(c) <= 126 or c in "\r\n" for c in text))
 
-    def test_file_encrypt_to_armored_text_then_upload_decrypt(self):
+    def test_file_encrypt_to_text_then_upload_decrypt(self):
         encrypt = self.client.post(
             "/api/encrypt",
             data={
@@ -88,8 +90,8 @@ class AppTests(unittest.TestCase):
             content_type="multipart/form-data",
         )
         self.assertEqual(encrypt.status_code, 200)
-        armor_text = encrypt.get_json()["result"]["text"]
-        self.assertIn("BEGIN PGP MESSAGE", armor_text)
+        encoded_text = encrypt.get_json()["result"]["text"]
+        self.assertNotIn("BEGIN PGP MESSAGE", encoded_text)
 
         decrypt = self.client.post(
             "/api/decrypt",
@@ -97,7 +99,7 @@ class AppTests(unittest.TestCase):
                 "input_type": "file",
                 "mode": "symmetric",
                 "passphrase": "pw",
-                "ciphertext_file": (BytesIO(armor_text.encode("utf-8")), "demo.txt.asc"),
+                "ciphertext_file": (BytesIO(encoded_text.encode("utf-8")), "demo.txt.txt"),
             },
             content_type="multipart/form-data",
         )
@@ -128,9 +130,9 @@ class AppTests(unittest.TestCase):
 
         download = self.client.get(payload["download_url"])
         self.assertEqual(download.status_code, 200)
-        armor_text = download.data.decode("utf-8")
+        encoded_text = download.data.decode("utf-8")
         download.close()
-        self.assertIn("BEGIN PGP MESSAGE", armor_text)
+        self.assertNotIn("BEGIN PGP MESSAGE", encoded_text)
 
         decrypt = self.client.post(
             "/api/decrypt",
@@ -138,7 +140,7 @@ class AppTests(unittest.TestCase):
                 "input_type": "text",
                 "mode": "symmetric",
                 "passphrase": "pw",
-                "ciphertext_text": armor_text,
+                "ciphertext_text": encoded_text,
             },
         )
         self.assertEqual(decrypt.status_code, 200)
@@ -166,7 +168,7 @@ class AppTests(unittest.TestCase):
 
         download = self.client.get(payload["download_url"])
         self.assertEqual(download.status_code, 200)
-        armor_bytes = download.data
+        encoded_bytes = download.data
         download.close()
 
         decrypt = self.client.post(
@@ -175,7 +177,7 @@ class AppTests(unittest.TestCase):
                 "input_type": "text",
                 "mode": "symmetric",
                 "passphrase": "pw",
-                "ciphertext_text_file": (BytesIO(armor_bytes), "pasted-message.asc"),
+                "ciphertext_text_file": (BytesIO(encoded_bytes), "pasted-message.txt"),
             },
             content_type="multipart/form-data",
         )

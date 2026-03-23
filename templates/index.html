@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Local Workspace</title>
+    <title>ShenYin</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
@@ -11,20 +11,19 @@
     <main class="page">
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">Local Workspace</p>
-          <h1>本地资料工作台</h1>
+          <p class="eyebrow">ShenYin</p>
+          <h1>本地数据整理</h1>
           <p class="hero-text">
             离线处理文本和文件，支持文本模式与文件模式切换，浏览器页面仅连接本机。
           </p>
-          <p class="hero-subtle">界面已调整为更中性的本地工具样式，避免第一眼过于显眼。</p>
         </div>
       </section>
 
       <section class="panel-grid">
         <section class="panel">
           <div class="panel-head">
-            <h2>保护</h2>
-            <p>文本和文件统一入口。较短文本直接显示，超长文本只提供下载，避免页面卡死。</p>
+            <h2>整理</h2>
+            <p>文本和文件统一入口。较短文本直接显示，超长文本只提供下载。</p>
           </div>
           <form id="encrypt-form" class="tool-form">
             <div class="field-row switches">
@@ -41,7 +40,7 @@
             <div class="field-row switches">
               <label class="switch-card">
                 <input type="radio" name="mode" value="symmetric" checked>
-                <span>口令模式</span>
+                <span>访问码模式</span>
               </label>
               <label class="switch-card">
                 <input type="radio" name="mode" value="public">
@@ -54,7 +53,7 @@
               <textarea
                 name="text_input"
                 rows="9"
-                placeholder="输入要处理的文本"
+                placeholder="输入要整理的文本"
                 data-buffer-upload-field="text_input_file"
                 data-buffer-filename="pasted-text.txt"
               ></textarea>
@@ -71,25 +70,25 @@
               <label class="field">
                 <span>结果形式</span>
                 <select name="output_format" data-output-format>
-                  <option value="armor" selected>文本模式（推荐：复制粘贴）</option>
-                  <option value="binary">文件模式（推荐：体积更小）</option>
+                  <option value="armor" selected>文本格式（适合复制粘贴）</option>
+                  <option value="binary">文件格式（体积更小）</option>
                 </select>
               </label>
               <label class="field">
                 <span>压缩</span>
                 <select name="compression">
-                  <option value="zlib">ZLIB（推荐）</option>
-                  <option value="zip">ZIP</option>
+                  <option value="zlib">标准（推荐）</option>
+                  <option value="zip">兼容</option>
                   <option value="none">不压缩</option>
-                  <option value="bz2">BZ2</option>
+                  <option value="bz2">高压缩</option>
                 </select>
               </label>
             </div>
             <p class="helper-note" id="encrypt-mode-hint">当前是文本输入，会直接返回可复制结果。</p>
 
             <label class="field symmetric-only">
-              <span>口令</span>
-              <input type="password" name="passphrase" placeholder="输入对称加密口令">
+              <span>访问码</span>
+              <input type="password" name="passphrase" placeholder="输入访问码">
             </label>
 
             <label class="field public-only hidden">
@@ -99,7 +98,7 @@
               </select>
             </label>
 
-            <button type="submit" class="primary-btn">开始处理</button>
+            <button type="submit" class="primary-btn">开始整理</button>
           </form>
           <section id="encrypt-result" class="result-panel">
             <div class="result-empty">处理结果会显示在这里。</div>
@@ -108,8 +107,8 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>还原</h2>
-            <p>文本模式适合直接粘贴结果文本，超长文本也支持直接粘贴后还原。</p>
+            <h2>提取</h2>
+            <p>文本模式适合直接粘贴结果文本，超长文本也支持直接粘贴后提取。</p>
           </div>
           <form id="decrypt-form" class="tool-form">
             <div class="field-row switches">
@@ -126,7 +125,7 @@
             <div class="field-row switches">
               <label class="switch-card">
                 <input type="radio" name="mode" value="symmetric" checked>
-                <span>口令模式</span>
+                <span>访问码模式</span>
               </label>
               <label class="switch-card">
                 <input type="radio" name="mode" value="public">
@@ -139,12 +138,12 @@
               <textarea
                 name="ciphertext_text"
                 rows="9"
-                placeholder="粘贴要还原的文本"
+                placeholder="粘贴要提取的文本"
                 data-buffer-upload-field="ciphertext_text_file"
-                data-buffer-filename="pasted-message.asc"
+                data-buffer-filename="pasted-data.txt"
               ></textarea>
             </label>
-            <p class="helper-note text-only">如果文本很长可以直接粘贴，工具会自动进入缓存模式，不再要求分段拼接。</p>
+            <p class="helper-note text-only">如果文本很长可以直接粘贴，工具会自动进入缓存模式。</p>
             <div class="helper-note hidden text-only" data-buffer-status="ciphertext_text"></div>
             <button type="button" class="ghost-btn hidden text-only" data-buffer-clear="ciphertext_text">清空缓存文本</button>
 
@@ -154,8 +153,8 @@
             </label>
 
             <label class="field">
-              <span>口令 / 本地凭据口令</span>
-              <input type="password" name="passphrase" placeholder="输入口令">
+              <span>访问码</span>
+              <input type="password" name="passphrase" placeholder="输入访问码">
             </label>
 
             <label class="field public-only hidden">
@@ -165,85 +164,87 @@
               </select>
             </label>
 
-            <button type="submit" class="primary-btn">开始还原</button>
+            <button type="submit" class="primary-btn">开始提取</button>
           </form>
           <section id="decrypt-result" class="result-panel">
-            <div class="result-empty">还原后的文本或文件会显示在这里。</div>
+            <div class="result-empty">提取后的文本或文件会显示在这里。</div>
           </section>
         </section>
       </section>
 
       <section class="panel key-panel">
-        <div class="panel-head">
-          <h2>凭据</h2>
-          <p>这里保存的是本地工具使用的凭据，不依赖系统级密钥环。</p>
+        <div class="panel-head collapsible-head" id="key-toggle">
+          <h2>凭据管理</h2>
+          <button type="button" class="ghost-btn" id="key-collapse-btn">展开</button>
         </div>
 
-        <div class="key-grid">
-          <form id="generate-form" class="tool-form">
-            <h3>新增本地凭据</h3>
-            <label class="field">
-              <span>姓名</span>
-              <input type="text" name="name" placeholder="例如 Han">
-            </label>
-            <label class="field">
-              <span>邮箱</span>
-              <input type="email" name="email" placeholder="name@example.com">
-            </label>
-            <label class="field">
-              <span>备注</span>
-              <input type="text" name="comment" placeholder="可选">
-            </label>
-            <div class="field-row">
+        <div id="key-body" class="key-body hidden">
+          <div class="key-grid">
+            <form id="generate-form" class="tool-form">
+              <h3>新增本地凭据</h3>
               <label class="field">
-              <span>位数</span>
-              <select name="key_size">
-                <option value="3072">3072（推荐）</option>
-                <option value="4096">4096</option>
-                <option value="2048">2048</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>本地口令</span>
-              <input type="password" name="passphrase" placeholder="为空则不额外保护">
-            </label>
+                <span>姓名</span>
+                <input type="text" name="name" placeholder="例如 Han">
+              </label>
+              <label class="field">
+                <span>邮箱</span>
+                <input type="email" name="email" placeholder="name@example.com">
+              </label>
+              <label class="field">
+                <span>备注</span>
+                <input type="text" name="comment" placeholder="可选">
+              </label>
+              <div class="field-row">
+                <label class="field">
+                <span>位数</span>
+                <select name="key_size">
+                  <option value="3072">3072（推荐）</option>
+                  <option value="4096">4096</option>
+                  <option value="2048">2048</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>本地访问码</span>
+                <input type="password" name="passphrase" placeholder="为空则不额外保护">
+              </label>
+            </div>
+              <button type="submit" class="secondary-btn">生成并保存</button>
+            </form>
+
+            <form id="import-form" class="tool-form">
+              <h3>导入已有凭据</h3>
+              <label class="field">
+                <span>文本内容</span>
+                <textarea name="key_text" rows="9" placeholder="粘贴已有内容"></textarea>
+              </label>
+              <label class="field">
+                <span>或上传文件</span>
+                <input type="file" name="key_file">
+              </label>
+              <button type="submit" class="secondary-btn">导入到本地库</button>
+            </form>
           </div>
-            <button type="submit" class="secondary-btn">生成并保存</button>
-          </form>
 
-          <form id="import-form" class="tool-form">
-            <h3>导入已有凭据</h3>
-            <label class="field">
-              <span>文本内容</span>
-              <textarea name="key_text" rows="9" placeholder="粘贴已有内容"></textarea>
-            </label>
-            <label class="field">
-              <span>或上传文件</span>
-              <input type="file" name="key_file">
-            </label>
-            <button type="submit" class="secondary-btn">导入到本地库</button>
-          </form>
-        </div>
-
-        <section id="key-feedback" class="result-panel compact">
-          <div class="result-empty">新增或导入后的反馈会显示在这里。</div>
-        </section>
-
-        <div class="key-list-grid">
-          <section class="key-list">
-            <div class="list-head">
-              <h3>接收凭据</h3>
-              <button type="button" class="ghost-btn" id="refresh-public">刷新</button>
-            </div>
-            <div id="public-keys" class="list-body"></div>
+          <section id="key-feedback" class="result-panel compact">
+            <div class="result-empty">新增或导入后的反馈会显示在这里。</div>
           </section>
-          <section class="key-list">
-            <div class="list-head">
-              <h3>本地凭据</h3>
-              <button type="button" class="ghost-btn" id="refresh-private">刷新</button>
-            </div>
-            <div id="private-keys" class="list-body"></div>
-          </section>
+
+          <div class="key-list-grid">
+            <section class="key-list">
+              <div class="list-head">
+                <h3>接收凭据</h3>
+                <button type="button" class="ghost-btn" id="refresh-public">刷新</button>
+              </div>
+              <div id="public-keys" class="list-body"></div>
+            </section>
+            <section class="key-list">
+              <div class="list-head">
+                <h3>本地凭据</h3>
+                <button type="button" class="ghost-btn" id="refresh-private">刷新</button>
+              </div>
+              <div id="private-keys" class="list-body"></div>
+            </section>
+          </div>
         </div>
       </section>
     </main>
