@@ -22,7 +22,7 @@ COMPRESSION_MAP = {
     "none": ("none", "0"),
     "zip": ("zip", "6"),
     "zlib": ("zlib", "6"),
-    "bz2": ("bz2", "6"),
+    "bz2": ("bzip2", "6"),
 }
 
 
@@ -57,6 +57,13 @@ def initialize_home(home: Path) -> None:
     (home / "gpg-agent.conf").write_text("allow-loopback-pinentry\n", encoding="utf-8")
 
 
+def _subprocess_kwargs() -> dict:
+    kwargs: dict = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
+
 def run_gpg(homedir: Path, args: list[str], input_bytes: bytes | None = None, check: bool = True) -> subprocess.CompletedProcess:
     command = [
         str(gpg_binary()),
@@ -76,6 +83,7 @@ def run_gpg(homedir: Path, args: list[str], input_bytes: bytes | None = None, ch
         stderr=subprocess.PIPE,
         env=base_env(),
         check=False,
+        **_subprocess_kwargs(),
     )
     if check and completed.returncode != 0:
         stderr = completed.stderr.decode("utf-8", errors="replace")

@@ -47,6 +47,19 @@ jobs:
         shell: cmd
         run: build_exe.bat
 
+      - name: Smoke Test EXE
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "dist\ShenYin.exe" -ArgumentList "--host","127.0.0.1","--port","19876","--no-browser" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 5
+          try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:19876/" -UseBasicParsing -TimeoutSec 10
+            if ($resp.StatusCode -ne 200) { throw "HTTP $($resp.StatusCode)" }
+            Write-Host "Smoke test passed: HTTP 200"
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
