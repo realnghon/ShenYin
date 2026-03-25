@@ -9,8 +9,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
-from pgpbox.crypto import CryptoError, decrypt_content, encrypt_content, generate_rsa_key
-from pgpbox.keystore import KeyStore, KeyStoreError
+from pgpbox.crypto import CryptoError, decrypt_content, encrypt_content
 from pgpbox.result_store import ResultStore
 from pgpbox.transport import extract_text_payload
 
@@ -24,7 +23,6 @@ def app_root() -> Path:
 APP_ROOT = app_root()
 RUNTIME_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else APP_ROOT
 DATA_DIR = RUNTIME_ROOT / "data"
-KEY_STORE = KeyStore(DATA_DIR / "keys")
 RESULT_STORE = ResultStore(DATA_DIR / "results")
 
 app = Flask(
@@ -77,107 +75,9 @@ def index():
     return render_template("index.html")
 
 
-@app.get("/api/keys")
-def list_keys():
-    return jsonify({"ok": True, "keys": KEY_STORE.list_all()})
-
-
-@app.post("/api/keys/import")
-def import_key():
-    key_text = request.form.get("key_text", "").strip()
-    key_file = request.files.get("key_file")
-
-    if key_file and key_file.filename:
-        blob: str | bytes = key_file.read()
-    elif key_text:
-        blob = key_text
-    else:
-        return json_error("请提供要导入的公钥或私钥。")
-
-    try:
-        saved = KEY_STORE.import_blob(blob)
-    except KeyStoreError as exc:
-        return json_error(str(exc))
-
-    return jsonify(
-        {
-            "ok": True,
-            "message": "凭据已导入本地工具。",
-            "saved": saved,
-            "keys": KEY_STORE.list_all(),
-        }
-    )
-
-
-@app.post("/api/keys/generate")
-def generate_key():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip()
-    comment = request.form.get("comment", "").strip()
-    passphrase = request.form.get("passphrase", "")
-
-    try:
-        key_size = int(request.form.get("key_size", "3072"))
-    except ValueError:
-        return json_error("凭据位数无效。")
-
-    try:
-        key = generate_rsa_key(
-            name=name,
-            email=email,
-            comment=comment,
-            passphrase=passphrase,
-            key_size=key_size,
-        )
-        KEY_STORE.save_key(key)
-    except (CryptoError, KeyStoreError) as exc:
-        return json_error(str(exc))
-
-    fingerprint = KEY_STORE.normalize_fingerprint(str(key.fingerprint))
-    return jsonify(
-        {
-            "ok": True,
-            "message": "新的凭据对已生成并保存。",
-            "fingerprint": fingerprint,
-            "downloads": {
-                "public": url_for("download_key", kind="public", fingerprint=fingerprint),
-                "private": url_for("download_key", kind="private", fingerprint=fingerprint),
-            },
-            "keys": KEY_STORE.list_all(),
-        }
-    )
-
-
-@app.get("/api/keys/<kind>/<fingerprint>")
-def download_key(kind: str, fingerprint: str):
-    try:
-        asset = KEY_STORE.export_key(kind, fingerprint)
-    except KeyStoreError as exc:
-        return json_error(str(exc), 404)
-
-    return send_file(
-        asset.path,
-        as_attachment=True,
-        download_name=asset.filename,
-        mimetype="text/plain; charset=utf-8",
-        max_age=0,
-    )
-
-
-@app.delete("/api/keys/<kind>/<fingerprint>")
-def delete_key(kind: str, fingerprint: str):
-    try:
-        KEY_STORE.delete_key(kind, fingerprint)
-    except KeyStoreError as exc:
-        return json_error(str(exc), 404)
-
-    return jsonify({"ok": True, "message": "凭据已删除。", "keys": KEY_STORE.list_all()})
-
-
 @app.post("/api/encrypt")
 def encrypt():
     input_type = request.form.get("input_type", "text")
-    mode = request.form.get("mode", "symmetric")
     output_format = request.form.get("output_format", "")
     compression = request.form.get("compression", "zlib")
 
@@ -190,7 +90,6 @@ def encrypt():
 
     kwargs = {
         "input_type": input_type,
-        "mode": mode,
         "armor": output_format == "armor",
         "compression_name": compression,
         "passphrase": request.form.get("passphrase", ""),
@@ -212,17 +111,9 @@ def encrypt():
         kwargs["file_name"] = upload.filename
         kwargs["file_bytes"] = upload.read()
 
-    if mode == "public":
-        fingerprint = request.form.get("public_key_fingerprint", "")
-        try:
-            kwargs["public_key"] = KEY_STORE.load_key("public", fingerprint)
-            kwargs["public_key_fingerprint"] = fingerprint
-        except KeyStoreError as exc:
-            return json_error(str(exc))
-
     try:
         result = encrypt_content(**kwargs)
-    except (CryptoError, KeyStoreError) as exc:
+    except CryptoError as exc:
         return json_error(str(exc))
 
     return jsonify(
@@ -237,14 +128,12 @@ def encrypt():
 @app.post("/api/decrypt")
 def decrypt():
     input_type = request.form.get("input_type", "text")
-    mode = request.form.get("mode", "symmetric")
     text_value = request.form.get("ciphertext_text", "")
     text_upload = request.files.get("ciphertext_text_file")
     upload = request.files.get("ciphertext_file")
     passphrase = request.form.get("passphrase", "")
 
     kwargs = {
-        "mode": mode,
         "passphrase": passphrase,
     }
 
@@ -260,16 +149,9 @@ def decrypt():
             return json_error("请选择一个要解密的文件。")
         kwargs["encrypted_blob"] = upload.read()
 
-    if mode == "public":
-        fingerprint = request.form.get("private_key_fingerprint", "")
-        try:
-            kwargs["private_key"] = KEY_STORE.load_key("private", fingerprint)
-        except KeyStoreError as exc:
-            return json_error(str(exc))
-
     try:
         result = decrypt_content(**kwargs)
-    except (CryptoError, KeyStoreError) as exc:
+    except CryptoError as exc:
         return json_error(str(exc))
 
     return jsonify(

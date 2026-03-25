@@ -1,10 +1,6 @@
 const LARGE_TEXT_BUFFER_THRESHOLD = 200_000;
 
 const state = {
-  keys: {
-    public: [],
-    private: [],
-  },
   buffers: new Map(),
 };
 
@@ -48,12 +44,9 @@ function renderMessage(target, type, text) {
 
 function toggleModeBlocks(form) {
   const inputType = qs('input[name="input_type"]:checked', form)?.value ?? "text";
-  const mode = qs('input[name="mode"]:checked', form)?.value ?? "symmetric";
 
   qsa(".text-only", form).forEach((node) => node.classList.toggle("hidden", inputType !== "text"));
   qsa(".file-only", form).forEach((node) => node.classList.toggle("hidden", inputType !== "file"));
-  qsa(".symmetric-only", form).forEach((node) => node.classList.toggle("hidden", mode !== "symmetric"));
-  qsa(".public-only", form).forEach((node) => node.classList.toggle("hidden", mode !== "public"));
 }
 
 function syncEncryptDefaults(form) {
@@ -81,63 +74,6 @@ function syncEncryptDefaults(form) {
   }
 
   hint.textContent = "当前是文件输入 + 文件结果，适合直接下载保存。";
-}
-
-function buildOptionMarkup(items, placeholder) {
-  const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
-  for (const item of items) {
-    options.push(`<option value="${item.fingerprint}">${escapeHtml(item.label)} | ${escapeHtml(item.key_id)}</option>`);
-  }
-  return options.join("");
-}
-
-function syncKeySelects() {
-  qsa('[data-key-select="public"]').forEach((select) => {
-    select.innerHTML = buildOptionMarkup(state.keys.public, "请先导入或生成接收凭据");
-  });
-  qsa('[data-key-select="private"]').forEach((select) => {
-    select.innerHTML = buildOptionMarkup(state.keys.private, "请先导入或生成本地凭据");
-  });
-}
-
-function keyActions(kind, item) {
-  return [
-    `<a class="mini-btn" href="/api/keys/${kind}/${item.fingerprint}" target="_blank" rel="noreferrer">下载</a>`,
-    `<button type="button" class="mini-btn danger" data-delete-key="${kind}:${item.fingerprint}">删除</button>`,
-  ].join("");
-}
-
-function renderKeyLists() {
-  const template = qs("#key-card-template");
-  syncKeySelects();
-
-  for (const kind of ["public", "private"]) {
-    const mount = qs(`#${kind}-keys`);
-    mount.innerHTML = "";
-    const items = state.keys[kind];
-
-    if (!items.length) {
-      mount.innerHTML = '<div class="result-empty">当前没有保存的凭据。</div>';
-      continue;
-    }
-
-    for (const item of items) {
-      const fragment = template.content.cloneNode(true);
-      qs("strong", fragment).textContent = item.label;
-      qs(".key-tag", fragment).textContent = item.is_protected ? "受口令保护" : "未加保护";
-      qs(".key-fingerprint", fragment).textContent = item.display_fingerprint;
-      qs(".key-actions", fragment).innerHTML = keyActions(kind, item);
-
-      const list = qs(".key-uids", fragment);
-      for (const uid of item.user_ids) {
-        const li = document.createElement("li");
-        li.textContent = uid;
-        list.appendChild(li);
-      }
-
-      mount.appendChild(fragment);
-    }
-  }
 }
 
 function renderResult(target, payload, message) {
@@ -320,13 +256,6 @@ function buildFormData(form) {
   return formData;
 }
 
-async function fetchKeys() {
-  const response = await fetch("/api/keys");
-  const data = await parseResponse(response);
-  state.keys = data.keys;
-  renderKeyLists();
-}
-
 async function submitForm(form, url, resultTarget) {
   const response = await fetch(url, {
     method: "POST",
@@ -336,21 +265,7 @@ async function submitForm(form, url, resultTarget) {
   if (resultTarget) {
     renderResult(resultTarget, data.result, data.message);
   }
-  if (data.keys) {
-    state.keys = data.keys;
-    renderKeyLists();
-  }
   return data;
-}
-
-async function deleteKey(kind, fingerprint) {
-  const response = await fetch(`/api/keys/${kind}/${fingerprint}`, {
-    method: "DELETE",
-  });
-  const data = await parseResponse(response);
-  state.keys = data.keys;
-  renderKeyLists();
-  renderMessage(qs("#key-feedback"), "notice", data.message);
 }
 
 function bindToolForm(formId, url, resultId) {
@@ -380,61 +295,8 @@ function bindToolForm(formId, url, resultId) {
   });
 }
 
-function bindKeyForms() {
-  const generateForm = qs("#generate-form");
-  const importForm = qs("#import-form");
-  const feedback = qs("#key-feedback");
-
-  generateForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    renderMessage(feedback, "notice", "正在生成凭据，这一步会比普通操作稍慢。");
-    try {
-      const data = await submitForm(generateForm, "/api/keys/generate");
-      feedback.innerHTML = `
-        <div class="result-block">
-          <div class="notice">${escapeHtml(data.message)}</div>
-          <div class="result-actions">
-            <a class="download-link" href="${data.downloads.public}" target="_blank" rel="noreferrer">下载公钥</a>
-            <a class="download-link" href="${data.downloads.private}" target="_blank" rel="noreferrer">下载私钥</a>
-          </div>
-        </div>
-      `;
-      generateForm.reset();
-    } catch (error) {
-      renderMessage(feedback, "error", error.message);
-    }
-  });
-
-  importForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    renderMessage(feedback, "notice", "正在导入凭据。");
-    try {
-      const data = await submitForm(importForm, "/api/keys/import");
-      const lines = data.saved.map((item) => `${item.kind}: ${item.label} | ${item.key_id}`);
-      renderMessage(feedback, "notice", `导入完成。${lines.join(" ; ")}`);
-      importForm.reset();
-    } catch (error) {
-      renderMessage(feedback, "error", error.message);
-    }
-  });
-}
-
 function bindGlobalEvents() {
   document.addEventListener("click", async (event) => {
-    const deleteButton = event.target.closest("[data-delete-key]");
-    if (deleteButton) {
-      const [kind, fingerprint] = deleteButton.dataset.deleteKey.split(":");
-      if (!window.confirm("确认删除这个凭据吗？")) {
-        return;
-      }
-      try {
-        await deleteKey(kind, fingerprint);
-      } catch (error) {
-        renderMessage(qs("#key-feedback"), "error", error.message);
-      }
-      return;
-    }
-
     const copyButton = event.target.closest("[data-copy-result]");
     if (copyButton) {
       const textarea = copyButton.closest(".result-block")?.querySelector(".result-output");
@@ -448,31 +310,12 @@ function bindGlobalEvents() {
       }, 1200);
     }
   });
-
-  qs("#refresh-public").addEventListener("click", fetchKeys);
-  qs("#refresh-private").addEventListener("click", fetchKeys);
 }
 
-async function init() {
+function init() {
   bindToolForm("#encrypt-form", "/api/encrypt", "#encrypt-result");
   bindToolForm("#decrypt-form", "/api/decrypt", "#decrypt-result");
-  bindKeyForms();
   bindGlobalEvents();
-
-  const keyBody = qs("#key-body");
-  const keyBtn = qs("#key-collapse-btn");
-  if (keyBody && keyBtn) {
-    qs("#key-toggle").addEventListener("click", () => {
-      const isHidden = keyBody.classList.toggle("hidden");
-      keyBtn.textContent = isHidden ? "展开" : "收起";
-    });
-  }
-
-  try {
-    await fetchKeys();
-  } catch (error) {
-    renderMessage(qs("#key-feedback"), "error", error.message);
-  }
 }
 
 window.addEventListener("DOMContentLoaded", init);

@@ -18,10 +18,6 @@ def decode_text_input(text: str) -> bytes:
     return base64.b85decode(stripped)
 
 
-def is_pgp_armor(blob: str) -> bool:
-    return blob.lstrip().startswith("-----BEGIN PGP ")
-
-
 def extract_text_payload(text: str, filename: str, token: str) -> dict[str, object]:
     del filename, token
 
@@ -40,23 +36,18 @@ def extract_text_payload(text: str, filename: str, token: str) -> dict[str, obje
     }
 
 
-def normalize_transport_blob(blob: str | bytes) -> str | bytes:
+def normalize_transport_blob(blob: str | bytes) -> bytes:
     if isinstance(blob, str):
         text = blob.strip()
-        if is_pgp_armor(text):
-            return text
         try:
             return decode_text_input(text)
         except Exception:
-            return text
+            return text.encode("utf-8")
 
     try:
         text = blob.decode("utf-8").strip()
     except UnicodeDecodeError:
         return blob
-
-    if is_pgp_armor(text):
-        return text
 
     try:
         return decode_text_input(text)

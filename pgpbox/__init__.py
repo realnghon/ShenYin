@@ -1,1 +1,1 @@
-"""Local PGP workbench package."""
+"""Local data workspace package."""

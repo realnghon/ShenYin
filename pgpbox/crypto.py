@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pgpy import PGPKey, PGPUID
-from pgpy.constants import CompressionAlgorithm, HashAlgorithm, KeyFlags, PubKeyAlgorithm, SymmetricKeyAlgorithm
 from werkzeug.utils import secure_filename
 
-from pgpbox.gpg_engine import GpgError, decrypt_bytes, encrypt_bytes
+from pgpbox.engine import EngineError, decrypt_bytes, encrypt_bytes
 from pgpbox.transport import encode_text_output, normalize_transport_blob
 
 
@@ -23,57 +21,9 @@ class CryptoResult:
     inline_text: str | None = None
 
 
-def unwrap_pgpy(value):
-    if isinstance(value, tuple):
-        return value[0]
-    if isinstance(value, list):
-        return value[0]
-    return value
-
-
 def safe_filename(name: str, fallback: str) -> str:
     cleaned = secure_filename(name)
     return cleaned or fallback
-
-
-def generate_rsa_key(
-    *,
-    name: str,
-    email: str,
-    comment: str,
-    passphrase: str,
-    key_size: int,
-) -> PGPKey:
-    if not name:
-        raise CryptoError("生成凭据时必须填写姓名。")
-    if not email:
-        raise CryptoError("生成凭据时必须填写邮箱。")
-    if key_size not in {2048, 3072, 4096}:
-        raise CryptoError("凭据位数仅支持 2048 / 3072 / 4096。")
-
-    key = PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, key_size)
-    uid = PGPUID.new(name, comment=comment, email=email)
-    key.add_uid(
-        uid,
-        usage={
-            KeyFlags.Certify,
-            KeyFlags.Sign,
-            KeyFlags.EncryptCommunications,
-            KeyFlags.EncryptStorage,
-        },
-        hashes=[HashAlgorithm.SHA256, HashAlgorithm.SHA384, HashAlgorithm.SHA512],
-        ciphers=[SymmetricKeyAlgorithm.AES256, SymmetricKeyAlgorithm.AES192, SymmetricKeyAlgorithm.AES128],
-        compression=[
-            CompressionAlgorithm.ZLIB,
-            CompressionAlgorithm.ZIP,
-            CompressionAlgorithm.Uncompressed,
-        ],
-    )
-
-    if passphrase:
-        key.protect(passphrase, SymmetricKeyAlgorithm.AES256, HashAlgorithm.SHA256)
-
-    return key
 
 
 def _download_name(input_type: str, source_name: str | None, text_mode: bool) -> str:
@@ -85,15 +35,12 @@ def _download_name(input_type: str, source_name: str | None, text_mode: bool) ->
 def encrypt_content(
     *,
     input_type: str,
-    mode: str,
     armor: bool,
     compression_name: str,
     passphrase: str = "",
     text_value: str = "",
     file_name: str | None = None,
     file_bytes: bytes | None = None,
-    public_key: PGPKey | None = None,
-    public_key_fingerprint: str | None = None,
 ) -> CryptoResult:
     if input_type == "text":
         if not text_value:
@@ -110,23 +57,17 @@ def encrypt_content(
     else:
         raise CryptoError("不支持的输入类型。")
 
-    if mode == "symmetric" and not passphrase:
-        raise CryptoError("对称加密必须输入口令。")
-    if mode == "public" and public_key is None:
-        raise CryptoError("请选择一个公钥。")
+    if not passphrase:
+        raise CryptoError("必须输入访问码。")
 
     try:
         output_bytes = encrypt_bytes(
             payload=payload,
-            armor=False,
-            compression_name=compression_name,
-            mode=mode,
             passphrase=passphrase,
+            compression_name=compression_name,
             source_filename=source_name if input_type == "file" else None,
-            public_key_text=str(public_key) if public_key is not None else None,
-            public_key_fingerprint=public_key_fingerprint or (str(public_key.fingerprint) if public_key is not None else None),
         )
-    except GpgError as exc:
+    except EngineError as exc:
         raise CryptoError(f"加密失败：{exc}") from exc
 
     if armor:
@@ -152,28 +93,22 @@ def encrypt_content(
 
 def decrypt_content(
     *,
-    mode: str,
     encrypted_blob: str | bytes,
     passphrase: str = "",
-    private_key: PGPKey | None = None,
 ) -> CryptoResult:
     if not encrypted_blob:
         raise CryptoError("请提供要解密的内容。")
-    if mode == "symmetric" and not passphrase:
-        raise CryptoError("对称解密必须输入口令。")
-    if mode == "public" and private_key is None:
-        raise CryptoError("请选择一个私钥。")
+    if not passphrase:
+        raise CryptoError("必须输入访问码。")
 
     normalized_blob = normalize_transport_blob(encrypted_blob)
 
     try:
         decrypted = decrypt_bytes(
             encrypted_blob=normalized_blob,
-            mode=mode,
             passphrase=passphrase,
-            private_key_text=str(private_key) if private_key is not None else None,
         )
-    except GpgError as exc:
+    except EngineError as exc:
         raise CryptoError(f"解密失败：{exc}") from exc
 
     if decrypted.filename:
