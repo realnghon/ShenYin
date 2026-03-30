@@ -13,7 +13,12 @@
 
 ## 下载使用
 
-从 [Releases](https://github.com/realnghon/ShenYin/releases) 下载 `ShenYin.exe`，双击即可运行。
+从 [Releases](https://github.com/realnghon/ShenYin/releases) 下载：
+
+- Windows：`ShenYin.exe`
+- macOS（Apple Silicon）：`ShenYin-macos-arm64.zip`
+
+首次在 macOS 上打开可能提示“已损坏”或“无法验证开发者”，在“系统设置 → 隐私与安全性”中允许后即可运行。
 
 - 无需安装 Python 或任何运行环境
 - 无需管理员权限
