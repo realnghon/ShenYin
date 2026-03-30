@@ -108,11 +108,11 @@ jobs:
           app_pid=$!
           sleep 5
           if ! curl --connect-timeout 5 --max-time 10 --fail --silent --show-error "http://127.0.0.1:19876/"; then
-            kill $app_pid
+            kill $app_pid || true
             wait $app_pid || true
             exit 1
           fi
-          kill $app_pid
+          kill $app_pid || true
           wait $app_pid || true
 
       - name: Archive App
