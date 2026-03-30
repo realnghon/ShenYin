@@ -9,3 +9,4 @@ data/keys/
 data/results/
 
 .pytest_cache/
+.worktrees/
