@@ -183,7 +183,12 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body: |
+            ## Release v${{ github.ref_name }}
+            - 新增 macOS Apple Silicon（M1+）版本：`ShenYin-macos-arm64.zip`
+            - 继续提供 Windows 版本：`ShenYin.exe`
+            - macOS 应用未签名，首次打开可能需要在系统安全设置中手动允许
+            - CI 构建与发布流程更新为 Windows + macOS 双平台产物
           files: |
             dist/ShenYin.exe
             dist/ShenYin-macos-arm64.zip
