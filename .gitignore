@@ -1,6 +1,8 @@
 .venv/
 __pycache__/
 *.py[cod]
+.claude/
+tmp.*.log
 
 build/
 dist/

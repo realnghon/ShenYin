@@ -1,6 +1,11 @@
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+
 use std::env;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::process::{Command, ExitCode};
 use std::thread;
 use std::time::Duration;
@@ -59,22 +64,43 @@ const INDEX_BODY: &str = r#"<!DOCTYPE html>
 "#;
 
 fn main() -> ExitCode {
-    match run() {
+    let options = match Options::parse(env::args().skip(1)) {
+        Ok(options) => options,
+        Err(error) => {
+            report_startup_error(&error, true);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match run(&options) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("{error}");
+            report_startup_error(&error, options.should_show_ui_errors());
             ExitCode::FAILURE
         }
     }
 }
 
-fn run() -> Result<(), String> {
-    let options = Options::parse(env::args().skip(1))?;
-    let listener = TcpListener::bind((options.host.as_str(), options.port))
-        .map_err(|error| format!("failed to bind {}:{}: {error}", options.host, options.port))?;
+fn run(options: &Options) -> Result<(), String> {
+    let listener = match TcpListener::bind((options.host.as_str(), options.port)) {
+        Ok(listener) => listener,
+        Err(error) => {
+            if options.can_reuse_existing_instance()
+                && shenyin_instance_is_available(&options.host, options.port)
+            {
+                open_browser_now(&options.url());
+                return Ok(());
+            }
+
+            return Err(format!(
+                "failed to bind {}:{}: {error}",
+                options.host, options.port
+            ));
+        }
+    };
 
     if !options.no_browser {
-        open_browser_later(options.host.clone(), options.port);
+        open_browser_later(options.url());
     }
 
     for stream in listener.incoming() {
@@ -98,6 +124,7 @@ struct Options {
     host: String,
     port: u16,
     no_browser: bool,
+    port_was_explicit: bool,
 }
 
 impl Options {
@@ -105,6 +132,7 @@ impl Options {
         let mut host = DEFAULT_HOST.to_owned();
         let mut port = DEFAULT_PORT;
         let mut no_browser = false;
+        let mut port_was_explicit = false;
         let mut args = args.into_iter();
 
         while let Some(argument) = args.next() {
@@ -117,6 +145,7 @@ impl Options {
                     port = value
                         .parse::<u16>()
                         .map_err(|_| format!("invalid value for --port: {value}"))?;
+                    port_was_explicit = true;
                 }
                 "--no-browser" => {
                     no_browser = true;
@@ -135,11 +164,24 @@ impl Options {
             host,
             port,
             no_browser,
+            port_was_explicit,
         })
     }
 
     fn usage() -> &'static str {
         "Usage: shenyin [--host HOST] [--port PORT] [--no-browser]"
+    }
+
+    fn can_reuse_existing_instance(&self) -> bool {
+        !self.no_browser && !self.port_was_explicit && self.host == DEFAULT_HOST
+    }
+
+    fn should_show_ui_errors(&self) -> bool {
+        !self.no_browser
+    }
+
+    fn url(&self) -> String {
+        format!("http://{}:{}/", self.host, self.port)
     }
 }
 
@@ -169,13 +211,28 @@ fn write_response(stream: &mut TcpStream, status: &str, body: &str) -> std::io::
     stream.flush()
 }
 
-fn open_browser_later(host: String, port: u16) {
+fn open_browser_later(url: String) {
+    if browser_launch_disabled() {
+        return;
+    }
+
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(500));
-        let url = format!("http://{host}:{port}/");
-        let mut command = browser_command(&url);
-        let _ = command.spawn();
+        open_browser_now(&url);
     });
+}
+
+fn open_browser_now(url: &str) {
+    if browser_launch_disabled() {
+        return;
+    }
+
+    let mut command = browser_command(url);
+    let _ = command.spawn();
+}
+
+fn browser_launch_disabled() -> bool {
+    env::var_os("SHENYIN_DISABLE_BROWSER").is_some()
 }
 
 fn browser_command(url: &str) -> Command {
@@ -192,4 +249,86 @@ fn browser_command(url: &str) -> Command {
         command.arg(url);
         command
     }
+}
+
+fn shenyin_instance_is_available(host: &str, port: u16) -> bool {
+    let address = match format!("{host}:{port}").parse::<SocketAddr>() {
+        Ok(address) => address,
+        Err(_) => return false,
+    };
+
+    let mut stream = match TcpStream::connect_timeout(&address, Duration::from_millis(400)) {
+        Ok(stream) => stream,
+        Err(_) => return false,
+    };
+
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(400)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(400)));
+
+    if stream
+        .write_all(
+            format!("GET / HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n")
+                .as_bytes(),
+        )
+        .is_err()
+    {
+        return false;
+    }
+
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+
+    response.starts_with("HTTP/1.1 200") && response.contains("ShenYin")
+}
+
+fn report_startup_error(message: &str, show_ui_error: bool) {
+    eprintln!("{message}");
+
+    #[cfg(target_os = "windows")]
+    if show_ui_error && !ui_error_disabled() {
+        show_windows_error_dialog(message);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn ui_error_disabled() -> bool {
+    browser_launch_disabled() || env::var_os("SHENYIN_DISABLE_UI_ERROR").is_some()
+}
+
+#[cfg(target_os = "windows")]
+fn show_windows_error_dialog(message: &str) {
+    let title = to_wide("ShenYin launch failed");
+    let body = to_wide(message);
+
+    unsafe {
+        let _ = MessageBoxW(
+            std::ptr::null_mut(),
+            body.as_ptr(),
+            title.as_ptr(),
+            MB_ICONERROR | MB_OK,
+        );
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn to_wide(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+const MB_OK: u32 = 0x0000;
+#[cfg(target_os = "windows")]
+const MB_ICONERROR: u32 = 0x0010;
+
+#[cfg(target_os = "windows")]
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn MessageBoxW(
+        hwnd: *mut core::ffi::c_void,
+        text: *const u16,
+        caption: *const u16,
+        kind: u32,
+    ) -> i32;
 }
