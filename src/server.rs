@@ -194,7 +194,10 @@ async fn index(
 
 async fn app_js() -> Response {
     (
-        [(CONTENT_TYPE, HeaderValue::from_static("application/javascript; charset=utf-8"))],
+        [(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/javascript; charset=utf-8"),
+        )],
         APP_JS,
     )
         .into_response()
@@ -202,7 +205,10 @@ async fn app_js() -> Response {
 
 async fn style_css() -> Response {
     (
-        [(CONTENT_TYPE, HeaderValue::from_static("text/css; charset=utf-8"))],
+        [(
+            CONTENT_TYPE,
+            HeaderValue::from_static("text/css; charset=utf-8"),
+        )],
         STYLE_CSS,
     )
         .into_response()
@@ -288,12 +294,16 @@ async fn download_result(
     let bytes = fs::read(&stored.path).map_err(|error| ApiError::internal(error.to_string()))?;
 
     let disposition = format!("attachment; filename=\"{}\"", stored.filename);
-    let disposition = HeaderValue::from_str(&disposition).map_err(|error| ApiError::internal(error.to_string()))?;
-    let content_type =
-        HeaderValue::from_str(&stored.mime_type).unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
+    let disposition = HeaderValue::from_str(&disposition)
+        .map_err(|error| ApiError::internal(error.to_string()))?;
+    let content_type = HeaderValue::from_str(&stored.mime_type)
+        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
 
     Ok((
-        [(CONTENT_TYPE, content_type), (CONTENT_DISPOSITION, disposition)],
+        [
+            (CONTENT_TYPE, content_type),
+            (CONTENT_DISPOSITION, disposition),
+        ],
         Body::from(bytes),
     )
         .into_response())
@@ -368,13 +378,7 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
             .to_vec();
 
         if let Some(file_name) = file_name {
-            parsed.files.insert(
-                name,
-                UploadedFile {
-                    file_name,
-                    bytes,
-                },
-            );
+            parsed.files.insert(name, UploadedFile { file_name, bytes });
         } else {
             let value = String::from_utf8(bytes)
                 .map_err(|_| ApiError::bad_request("表单文本必须是 UTF-8。"))?;

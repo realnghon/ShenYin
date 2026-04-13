@@ -2,12 +2,8 @@ use aes_gcm::{
     Aes256Gcm, KeyInit,
     aead::{Aead, Payload},
 };
-use bzip2::{
-    Compression as BzCompression, read::BzDecoder, write::BzEncoder,
-};
-use flate2::{
-    Compression as FlateCompression, read::ZlibDecoder, write::ZlibEncoder,
-};
+use bzip2::{Compression as BzCompression, read::BzDecoder, write::BzEncoder};
+use flate2::{Compression as FlateCompression, read::ZlibDecoder, write::ZlibEncoder};
 use pbkdf2::pbkdf2_hmac_array;
 use serde_json::Value;
 use sha2::Sha256;
@@ -64,8 +60,8 @@ pub fn encrypt_bytes(
     getrandom::fill(&mut nonce).map_err(|error| EngineError::Internal(error.to_string()))?;
 
     let key = derive_key(passphrase, &salt);
-    let cipher =
-        Aes256Gcm::new_from_slice(&key).map_err(|error| EngineError::Internal(error.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|error| EngineError::Internal(error.to_string()))?;
     let ciphertext = cipher
         .encrypt(
             nonce.as_slice().into(),
@@ -87,7 +83,10 @@ pub fn encrypt_bytes(
     Ok(output)
 }
 
-pub fn decrypt_bytes(encrypted_blob: &[u8], passphrase: &str) -> Result<DecryptResult, EngineError> {
+pub fn decrypt_bytes(
+    encrypted_blob: &[u8],
+    passphrase: &str,
+) -> Result<DecryptResult, EngineError> {
     let min_len = 1 + SALT_LEN + NONCE_LEN + 4;
     if encrypted_blob.len() < min_len {
         return Err(EngineError::InvalidData);
@@ -119,8 +118,8 @@ pub fn decrypt_bytes(encrypted_blob: &[u8], passphrase: &str) -> Result<DecryptR
     let ciphertext = &encrypted_blob[meta_start + meta_len..];
 
     let key = derive_key(passphrase, salt);
-    let cipher =
-        Aes256Gcm::new_from_slice(&key).map_err(|error| EngineError::Internal(error.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|error| EngineError::Internal(error.to_string()))?;
     let compressed = cipher
         .decrypt(
             nonce.into(),
@@ -131,7 +130,8 @@ pub fn decrypt_bytes(encrypted_blob: &[u8], passphrase: &str) -> Result<DecryptR
         )
         .map_err(|_| EngineError::BadCiphertext)?;
 
-    let meta: serde_json::Map<String, Value> = serde_json::from_slice(meta_bytes).unwrap_or_default();
+    let meta: serde_json::Map<String, Value> =
+        serde_json::from_slice(meta_bytes).unwrap_or_default();
     let compression = meta.get("c").and_then(Value::as_str).unwrap_or("none");
     let plaintext = decompress(&compressed, compression)?;
     let filename = meta.get("f").and_then(Value::as_str).map(str::to_owned);

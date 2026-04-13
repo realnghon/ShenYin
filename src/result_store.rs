@@ -66,7 +66,8 @@ impl ResultStore {
             size: content.len(),
             created_at: now_unix_seconds(),
         };
-        let meta_bytes = serde_json::to_vec(&meta).map_err(|error| ResultStoreError::Io(error.to_string()))?;
+        let meta_bytes =
+            serde_json::to_vec(&meta).map_err(|error| ResultStoreError::Io(error.to_string()))?;
         fs::write(self.meta_path(&token), meta_bytes).map_err(io_error)?;
 
         Ok(StoredResult {
@@ -86,8 +87,8 @@ impl ResultStore {
         }
 
         let meta_bytes = fs::read(meta_path).map_err(io_error)?;
-        let meta: StoredMeta =
-            serde_json::from_slice(&meta_bytes).map_err(|error| ResultStoreError::Io(error.to_string()))?;
+        let meta: StoredMeta = serde_json::from_slice(&meta_bytes)
+            .map_err(|error| ResultStoreError::Io(error.to_string()))?;
 
         Ok(StoredResult {
             token: token.to_owned(),

@@ -30,29 +30,28 @@ pub struct EncryptRequest {
 }
 
 pub fn encrypt_content(request: EncryptRequest) -> Result<CryptoResult, CryptoError> {
-    let (payload, source_name) = match request.input_type.as_str() {
-        "text" => {
-            if request.text_value.is_empty() {
-                return Err(CryptoError::Message("请输入要处理的纯文本。".into()));
+    let (payload, source_name) =
+        match request.input_type.as_str() {
+            "text" => {
+                if request.text_value.is_empty() {
+                    return Err(CryptoError::Message("请输入要处理的纯文本。".into()));
+                }
+                (request.text_value.into_bytes(), None)
             }
-            (request.text_value.into_bytes(), None)
-        }
-        "file" => {
-            let file_name = request
-                .file_name
-                .clone()
-                .ok_or_else(|| CryptoError::Message("文件模式下必须提供文件名和内容。".into()))?;
-            let file_bytes = request
-                .file_bytes
-                .clone()
-                .ok_or_else(|| CryptoError::Message("文件模式下必须提供文件名和内容。".into()))?;
-            if file_bytes.is_empty() {
-                return Err(CryptoError::Message("文件内容为空，无法继续。".into()));
+            "file" => {
+                let file_name = request.file_name.clone().ok_or_else(|| {
+                    CryptoError::Message("文件模式下必须提供文件名和内容。".into())
+                })?;
+                let file_bytes = request.file_bytes.clone().ok_or_else(|| {
+                    CryptoError::Message("文件模式下必须提供文件名和内容。".into())
+                })?;
+                if file_bytes.is_empty() {
+                    return Err(CryptoError::Message("文件内容为空，无法继续。".into()));
+                }
+                (file_bytes, Some(safe_filename(&file_name, "payload.bin")))
             }
-            (file_bytes, Some(safe_filename(&file_name, "payload.bin")))
-        }
-        _ => return Err(CryptoError::Message("不支持的输入类型。".into())),
-    };
+            _ => return Err(CryptoError::Message("不支持的输入类型。".into())),
+        };
 
     if request.passphrase.is_empty() {
         return Err(CryptoError::Message("必须输入访问码。".into()));
@@ -87,7 +86,10 @@ pub fn encrypt_content(request: EncryptRequest) -> Result<CryptoResult, CryptoEr
     })
 }
 
-pub fn decrypt_content(encrypted_blob: &[u8], passphrase: &str) -> Result<CryptoResult, CryptoError> {
+pub fn decrypt_content(
+    encrypted_blob: &[u8],
+    passphrase: &str,
+) -> Result<CryptoResult, CryptoError> {
     if encrypted_blob.is_empty() {
         return Err(CryptoError::Message("请提供要解密的内容。".into()));
     }
@@ -96,7 +98,8 @@ pub fn decrypt_content(encrypted_blob: &[u8], passphrase: &str) -> Result<Crypto
     }
 
     let normalized_blob = transport::normalize_transport_blob(encrypted_blob);
-    let decrypted = engine::decrypt_bytes(&normalized_blob, passphrase).map_err(map_engine_error("解密失败"))?;
+    let decrypted = engine::decrypt_bytes(&normalized_blob, passphrase)
+        .map_err(map_engine_error("解密失败"))?;
 
     if let Some(filename) = decrypted.filename {
         let filename = safe_filename(&filename, "decrypted.bin");
@@ -163,12 +166,16 @@ fn download_name(input_type: &str, source_name: Option<&str>, text_mode: bool) -
 
 fn map_engine_error(prefix: &'static str) -> impl FnOnce(EngineError) -> CryptoError {
     move |error| match error {
-        EngineError::BadCiphertext => CryptoError::Message("解密失败：访问码不正确或数据已损坏。".into()),
+        EngineError::BadCiphertext => {
+            CryptoError::Message("解密失败：访问码不正确或数据已损坏。".into())
+        }
         EngineError::UnsupportedVersion(version) => {
             CryptoError::Message(format!("不支持的数据版本：{version}"))
         }
         EngineError::InvalidData => CryptoError::Message("数据格式无效或已损坏。".into()),
-        EngineError::DecompressionFailed => CryptoError::Message("解压缩失败：数据可能已损坏。".into()),
+        EngineError::DecompressionFailed => {
+            CryptoError::Message("解压缩失败：数据可能已损坏。".into())
+        }
         EngineError::Internal(inner) => CryptoError::Message(format!("{prefix}：{inner}")),
     }
 }

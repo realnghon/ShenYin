@@ -81,7 +81,10 @@ async fn file_encrypt_to_text_and_download_roundtrip() {
                 .text("output_format", "armor")
                 .text("compression", "zlib")
                 .text("passphrase", "pw")
-                .part("file_input", Part::bytes(b"hello file".to_vec()).file_name("demo.txt")),
+                .part(
+                    "file_input",
+                    Part::bytes(b"hello file".to_vec()).file_name("demo.txt"),
+                ),
         )
         .send()
         .await
@@ -174,7 +177,9 @@ async fn large_file_encrypt_download_and_text_decrypt() {
 
     wait_until_ready(port).await;
     let client = reqwest::Client::new();
-    let original: Vec<u8> = (0..300_000).map(|index| ((index * 37 + 17) % 256) as u8).collect();
+    let original: Vec<u8> = (0..300_000)
+        .map(|index| ((index * 37 + 17) % 256) as u8)
+        .collect();
 
     let encrypt = client
         .post(format!("http://{HOST}:{port}/api/encrypt"))
@@ -184,7 +189,10 @@ async fn large_file_encrypt_download_and_text_decrypt() {
                 .text("output_format", "armor")
                 .text("compression", "none")
                 .text("passphrase", "pw")
-                .part("file_input", Part::bytes(original.clone()).file_name("large.bin")),
+                .part(
+                    "file_input",
+                    Part::bytes(original.clone()).file_name("large.bin"),
+                ),
         )
         .send()
         .await
@@ -263,11 +271,7 @@ fn extract_session(html: &str) -> String {
 async fn wait_until_ready(port: u16) {
     let client = reqwest::Client::new();
     for _ in 0..40 {
-        if let Ok(response) = client
-            .get(format!("http://{HOST}:{port}/"))
-            .send()
-            .await
-        {
+        if let Ok(response) = client.get(format!("http://{HOST}:{port}/")).send().await {
             if response.status() == reqwest::StatusCode::OK {
                 return;
             }
