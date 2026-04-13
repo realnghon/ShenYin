@@ -6,7 +6,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const HOST: &str = "127.0.0.1";
-const DEFAULT_PORT: u16 = 8765;
 
 #[test]
 fn serves_root_endpoint_with_requested_host_port() {
@@ -69,13 +68,15 @@ fn launching_without_args_reuses_existing_shenyin_instance() {
     let _guard = test_lock()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
+    let default_port = unused_port();
     let server = FakeServer::spawn(
-        DEFAULT_PORT,
+        default_port,
         "HTTP/1.1 200 OK\r\nContent-Length: 39\r\nConnection: close\r\n\r\n<html><title>ShenYin</title></html>",
     );
 
     let output = Command::new(binary_path())
         .env("SHENYIN_DISABLE_BROWSER", "1")
+        .env("SHENYIN_DEFAULT_PORT", default_port.to_string())
         .output()
         .expect("failed to run binary");
 
@@ -93,13 +94,16 @@ fn launching_without_args_still_fails_when_other_service_owns_default_port() {
     let _guard = test_lock()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
+    let default_port = unused_port();
     let server = FakeServer::spawn(
-        DEFAULT_PORT,
+        default_port,
         "HTTP/1.1 200 OK\r\nContent-Length: 32\r\nConnection: close\r\n\r\n<html><title>Other</title></html>",
     );
 
     let output = Command::new(binary_path())
         .env("SHENYIN_DISABLE_BROWSER", "1")
+        .env("SHENYIN_DISABLE_UI_ERROR", "1")
+        .env("SHENYIN_DEFAULT_PORT", default_port.to_string())
         .output()
         .expect("failed to run binary");
 

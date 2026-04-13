@@ -2,6 +2,8 @@ const LARGE_TEXT_BUFFER_THRESHOLD = 200_000;
 
 const state = {
   buffers: new Map(),
+  appSession: window.SHENYIN_BOOT?.session ?? null,
+  appSessionInterval: null,
 };
 
 function qs(selector, scope = document) {
@@ -312,10 +314,61 @@ function bindGlobalEvents() {
   });
 }
 
+async function sendAppSessionHeartbeat() {
+  if (!state.appSession) {
+    return;
+  }
+
+  try {
+    await fetch("/api/app-session/heartbeat", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ session_id: state.appSession }),
+      keepalive: true,
+    });
+  } catch {
+    // Ignore transient shutdown races.
+  }
+}
+
+function notifyAppSessionClosed() {
+  if (!state.appSession || !navigator.sendBeacon) {
+    return;
+  }
+
+  const payload = new Blob([JSON.stringify({ session_id: state.appSession })], {
+    type: "application/json",
+  });
+  navigator.sendBeacon("/api/app-session/close", payload);
+}
+
+function bindAppSessionLifecycle() {
+  if (!state.appSession) {
+    return;
+  }
+
+  sendAppSessionHeartbeat();
+  state.appSessionInterval = window.setInterval(sendAppSessionHeartbeat, 3000);
+
+  const closeHandler = () => {
+    if (state.appSessionInterval) {
+      window.clearInterval(state.appSessionInterval);
+      state.appSessionInterval = null;
+    }
+    notifyAppSessionClosed();
+  };
+
+  window.addEventListener("pagehide", closeHandler, { once: true });
+  window.addEventListener("beforeunload", closeHandler, { once: true });
+}
+
 function init() {
   bindToolForm("#encrypt-form", "/api/encrypt", "#encrypt-result");
   bindToolForm("#decrypt-form", "/api/decrypt", "#decrypt-result");
   bindGlobalEvents();
+  bindAppSessionLifecycle();
 }
 
 window.addEventListener("DOMContentLoaded", init);

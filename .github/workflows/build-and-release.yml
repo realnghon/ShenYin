@@ -228,8 +228,10 @@ jobs:
             - Windows x64: `ShenYin.exe`
             - Linux x64: `ShenYin-linux-x64.tar.gz`
             - macOS arm64: `ShenYin-macos-arm64.zip`
+            - 文本与文件加密/解密功能已完整迁移到 Rust
+            - 保持与原版兼容的 AES-256-GCM + PBKDF2 + Base85 文本传输协议
+            - 关闭应用页面后会自动停止本地 API 服务，避免后台继续占用端口
             - macOS `.app` remains unsigned and may require a manual allow step on first launch
-            - This release establishes the Rust startup, packaging, and GitHub Actions publish baseline
           overwrite_files: true
           make_latest: true
           files: |
