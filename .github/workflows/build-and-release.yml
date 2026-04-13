@@ -26,8 +26,8 @@ jobs:
           - label: Windows x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: ShenYin-win-x64
-            artifact_path: dist/ShenYin.exe
+            artifact_name: ShenYin-windows-x64
+            artifact_path: dist/ShenYin-windows-x64.exe
           - label: Linux x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -80,7 +80,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $proc = Start-Process -FilePath "dist\ShenYin.exe" -ArgumentList "--host","127.0.0.1","--port","19876","--no-browser" -PassThru -NoNewWindow
+          $proc = Start-Process -FilePath "dist\ShenYin-windows-x64.exe" -ArgumentList "--host","127.0.0.1","--port","19876","--no-browser" -PassThru -NoNewWindow
           $passed = $false
           try {
             for ($i = 0; $i -lt 30; $i++) {
@@ -167,7 +167,7 @@ jobs:
           exit 1
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
@@ -183,24 +183,24 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: ShenYin-win-x64
+          name: ShenYin-windows-x64
           path: dist
 
       - name: Download Linux artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ShenYin-linux-x64
           path: dist
 
       - name: Download macOS artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ShenYin-macos-arm64
           path: dist
@@ -218,14 +218,14 @@ jobs:
 
       - name: Publish version release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           body: |
             ## Release ${{ github.ref_name }}
 
-            - Windows x64: `ShenYin.exe`
+            - Windows x64: `ShenYin-windows-x64.exe`
             - Linux x64: `ShenYin-linux-x64.tar.gz`
             - macOS arm64: `ShenYin-macos-arm64.zip`
             - 文本与文件加密/解密功能已完整迁移到 Rust
@@ -235,6 +235,6 @@ jobs:
           overwrite_files: true
           make_latest: true
           files: |
-            dist/ShenYin.exe
+            dist/ShenYin-windows-x64.exe
             dist/ShenYin-linux-x64.tar.gz
             dist/ShenYin-macos-arm64.zip

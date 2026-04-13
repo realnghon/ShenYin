@@ -98,6 +98,9 @@ fn default_port() -> u16 {
 fn report_startup_error(message: &str, show_ui_error: bool) {
     eprintln!("{message}");
 
+    #[cfg(not(target_os = "windows"))]
+    let _ = show_ui_error;
+
     #[cfg(target_os = "windows")]
     if show_ui_error
         && std::env::var_os("SHENYIN_DISABLE_BROWSER").is_none()

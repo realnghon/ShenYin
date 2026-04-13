@@ -13,7 +13,7 @@ if (-not (Test-Path -LiteralPath $binaryPath)) {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-$artifactPath = Join-Path -Path $OutputDir -ChildPath "ShenYin.exe"
+$artifactPath = Join-Path -Path $OutputDir -ChildPath "ShenYin-windows-x64.exe"
 if (Test-Path -LiteralPath $artifactPath) {
     Remove-Item -LiteralPath $artifactPath -Force
 }
