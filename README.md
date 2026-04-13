@@ -1,60 +1,53 @@
 # ShenYin
 
-本地数据整理工具，纯离线运行。
+ShenYin 正在从 Python/PyInstaller 迁移到 Rust/Cargo。当前仓库已经切换到 Rust 三平台发布基线：GitHub Actions 会构建 Windows x64、Linux x64、macOS arm64 产物，并验证应用能以本地 HTTP 服务的形式启动。
 
-## 功能
+## 当前 Rust 基线
 
-- 支持纯文本和任意文件的双向处理（整理 / 提取）
-- 访问码模式：输入访问码即可加密解密，简单直接
-- 文本输出使用 Base85 高效编码，无外部格式标记
-- 支持多种压缩等级（标准 / 兼容 / 高压缩 / 不压缩）
-- 纯 Python 加密引擎（AES-256-GCM + PBKDF2），无外部依赖
-- 默认打开本地浏览器页面，所有数据仅在本机流转
+- 保留启动参数契约：`--host`、`--port`、`--no-browser`
+- 默认启动本地浏览器，也支持无界面 smoke test
+- `GET /` 返回 HTTP 200，供 CI 和手工验证使用
+- Release 继续保持 `main` -> rolling prerelease、`v*` -> 正式版
+- 现有 Python 协议实现仍保留在仓库中，后续会继续迁移到 Rust，当前阶段不改加密和传输约束
 
 ## 下载使用
 
 从 [Releases](https://github.com/realnghon/ShenYin/releases) 下载：
 
 - Windows：`ShenYin.exe`
+- Linux：`ShenYin-linux-x64.tar.gz`
 - macOS（Apple Silicon）：`ShenYin-macos-arm64.zip`
 
-首次在 macOS 上打开可能提示“已损坏”或“无法验证开发者”，在“系统设置 → 隐私与安全性”中允许后即可运行。
+macOS 应用仍然是未签名 `.app`，首次打开可能需要在“系统设置 -> 隐私与安全性”中手动允许。
 
-- 无需安装 Python 或任何运行环境
-- 无需管理员权限
-- 所有文件仅在 EXE 所在目录下生成
+### 启动方式
 
-## 开发运行
+- 直接双击 Windows EXE 或 macOS `.app`
+- Linux 解压后运行 `./ShenYin`
+- 命令行模式可显式传参：`--host 127.0.0.1 --port 8765 --no-browser`
+
+## 本地开发
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
-.\.venv\Scripts\python app.py
+cargo run -- --host 127.0.0.1 --port 8765
 ```
 
-启动后自动打开：
+如果只想验证 CI 使用的最小契约：
 
-```text
-http://127.0.0.1:8765
+```powershell
+cargo test
 ```
 
-## 使用建议
+## 迁移说明
 
-- 文本传输：保持文本格式输出，结果可直接复制粘贴
-- 文件传输：选择文件格式输出，体积更小
-- 超长文本：可直接粘贴，工具会自动进入缓存模式处理
-
-## 技术细节
-
-- 加密：AES-256-GCM 认证加密
-- 密钥派生：PBKDF2-HMAC-SHA256，600,000 次迭代
-- 每次加密使用随机 16 字节盐值 + 12 字节随机数
-- 传输编码：Base85（文本模式）
+- 当前 GitHub Releases 的重点是验证 Rust 启动、打包和发布链路
+- 历史 Python 代码和协议实现仍保留在 `app.py`、`pgpbox/`、`tests/`，作为迁移参考
+- 后续阶段会在不破坏既有协议的前提下，把核心功能逐步迁移到 Rust
 
 ## 发布
 
-- 推送到 `main` 分支会自动构建并发布滚动预发布版
-- 打 `v*` 标签（如 `v2.0.0`）会发布正式版本
+- 推送到 `main` 会自动构建三平台 rolling prerelease
+- 打 `v*` 标签（例如 `v2.0.0`）会自动发布正式版
 
 ## Contributors
 

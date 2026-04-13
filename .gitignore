@@ -4,6 +4,7 @@ __pycache__/
 
 build/
 dist/
+target/
 
 data/keys/
 data/results/
