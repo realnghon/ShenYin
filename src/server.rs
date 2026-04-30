@@ -79,6 +79,7 @@ impl ShutdownSignal {
 struct AppSession {
     token: String,
     last_seen: Mutex<SystemTime>,
+    heartbeat_seen: AtomicBool,
     closed: AtomicBool,
 }
 
@@ -87,12 +88,14 @@ impl AppSession {
         Arc::new(Self {
             token: uuid::Uuid::new_v4().simple().to_string(),
             last_seen: Mutex::new(SystemTime::now()),
+            heartbeat_seen: AtomicBool::new(false),
             closed: AtomicBool::new(false),
         })
     }
 
     async fn heartbeat(&self) {
         *self.last_seen.lock().await = SystemTime::now();
+        self.heartbeat_seen.store(true, Ordering::SeqCst);
     }
 
     fn close(&self) {
@@ -101,6 +104,10 @@ impl AppSession {
 
     fn token(&self) -> &str {
         &self.token
+    }
+
+    fn heartbeat_seen(&self) -> bool {
+        self.heartbeat_seen.load(Ordering::SeqCst)
     }
 }
 
@@ -390,6 +397,9 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
 }
 
 async fn watch_app_session(app_session: Arc<AppSession>, shutdown: ShutdownSignal) {
+    const FIRST_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(45);
+    const HEARTBEAT_STALE_TIMEOUT: Duration = Duration::from_secs(8);
+
     loop {
         if app_session.closed.load(Ordering::SeqCst) {
             shutdown.request_shutdown();
@@ -397,11 +407,14 @@ async fn watch_app_session(app_session: Arc<AppSession>, shutdown: ShutdownSigna
         }
 
         let last_seen = *app_session.last_seen.lock().await;
-        if last_seen
-            .elapsed()
-            .unwrap_or(Duration::ZERO)
-            .gt(&Duration::from_secs(8))
-        {
+        let elapsed = last_seen.elapsed().unwrap_or(Duration::ZERO);
+        let timeout = if app_session.heartbeat_seen() {
+            HEARTBEAT_STALE_TIMEOUT
+        } else {
+            FIRST_HEARTBEAT_TIMEOUT
+        };
+
+        if elapsed.gt(&timeout) {
             shutdown.request_shutdown();
             break;
         }
@@ -572,7 +585,7 @@ fn browser_command(url: &str) -> std::process::Command {
         command.args(["/C", "start", "", url]);
         command
     } else if cfg!(target_os = "macos") {
-        let mut command = std::process::Command::new("open");
+        let mut command = std::process::Command::new("/usr/bin/open");
         command.arg(url);
         command
     } else {
