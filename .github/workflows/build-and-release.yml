@@ -57,6 +57,32 @@ jobs:
       - name: Build Rust release binary
         run: cargo build --locked --release --target ${{ matrix.target }}
 
+      - name: Prepare macOS signing identity
+        if: runner.os == 'macOS' && secrets.MACOS_CERTIFICATE_P12 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != ''
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain_path="$RUNNER_TEMP/shenyin-signing.keychain-db"
+          cert_path="$RUNNER_TEMP/shenyin-signing.p12"
+          echo "$MACOS_CERTIFICATE_P12" | base64 -D > "$cert_path"
+          security create-keychain -p "${MACOS_KEYCHAIN_PASSWORD:-temp-password}" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "${MACOS_KEYCHAIN_PASSWORD:-temp-password}" "$keychain_path"
+          security import "$cert_path" -k "$keychain_path" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${MACOS_KEYCHAIN_PASSWORD:-temp-password}" "$keychain_path"
+          identity="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\\(.*\\)"/\\1/p' | head -n 1)"
+          if [[ -z "$identity" ]]; then
+            echo "No codesigning identity found in imported certificate." >&2
+            exit 1
+          fi
+          echo "CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "MACOS_SIGNING_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
+
       - name: Package Windows artifact
         if: runner.os == 'Windows'
         shell: pwsh
@@ -72,9 +98,31 @@ jobs:
       - name: Package macOS artifact
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          CODESIGN_IDENTITY: ${{ env.CODESIGN_IDENTITY }}
         run: |
           chmod +x scripts/package-macos-app.sh
           ./scripts/package-macos-app.sh '${{ matrix.target }}' release dist
+
+      - name: Notarize macOS artifact
+        if: runner.os == 'macOS' && env.CODESIGN_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.APPLE_APP_PASSWORD != '' && secrets.APPLE_TEAM_ID != ''
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit dist/ShenYin-macos-arm64.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          rm -rf notarize
+          mkdir -p notarize
+          ditto -x -k dist/ShenYin-macos-arm64.zip notarize
+          xcrun stapler staple notarize/ShenYin.app
+          ditto -c -k --sequesterRsrc --keepParent notarize/ShenYin.app dist/ShenYin-macos-arm64.zip
 
       - name: Smoke test Windows artifact
         if: runner.os == 'Windows'
@@ -173,6 +221,12 @@ jobs:
           path: ${{ matrix.artifact_path }}
           retention-days: 14
 
+      - name: Cleanup macOS signing keychain
+        if: always() && runner.os == 'macOS' && env.MACOS_SIGNING_KEYCHAIN != ''
+        shell: bash
+        run: |
+          security delete-keychain "$MACOS_SIGNING_KEYCHAIN" || true
+
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
@@ -231,7 +285,7 @@ jobs:
             - 文本与文件加密/解密功能已完整迁移到 Rust
             - 保持与原版兼容的 AES-256-GCM + PBKDF2 + Base85 文本传输协议
             - 关闭应用页面后会自动停止本地 API 服务，避免后台继续占用端口
-            - macOS `.app` remains unsigned and may require a manual allow step on first launch
+            - macOS release is notarized when Apple signing secrets are configured; otherwise CI falls back to ad-hoc signing and first launch may still require a manual allow step
           overwrite_files: true
           make_latest: true
           files: |
