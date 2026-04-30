@@ -556,8 +556,26 @@ pub fn runtime_root() -> PathBuf {
 }
 
 fn result_store_root() -> PathBuf {
-    if let Some(base_dir) = dirs::data_local_dir().or_else(dirs::data_dir) {
-        return base_dir.join("ShenYin").join("results");
+    if cfg!(target_os = "macos") {
+        if let Some(home_dir) = std::env::var_os("HOME") {
+            return PathBuf::from(home_dir)
+                .join("Library")
+                .join("Application Support")
+                .join("ShenYin")
+                .join("results");
+        }
+    } else if cfg!(target_os = "windows") {
+        if let Some(app_data) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("APPDATA")) {
+            return PathBuf::from(app_data).join("ShenYin").join("results");
+        }
+    } else if let Some(state_home) = std::env::var_os("XDG_STATE_HOME") {
+        return PathBuf::from(state_home).join("ShenYin").join("results");
+    } else if let Some(home_dir) = std::env::var_os("HOME") {
+        return PathBuf::from(home_dir)
+            .join(".local")
+            .join("state")
+            .join("ShenYin")
+            .join("results");
     }
 
     runtime_root().join("data").join("results")
