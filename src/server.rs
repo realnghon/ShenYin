@@ -143,7 +143,7 @@ pub async fn run(options: ServerOptions) -> Result<(), ServerError> {
     };
 
     let result_store = Arc::new(
-        ResultStore::new(runtime_root().join("data").join("results"), 24)
+        ResultStore::new(result_store_root(), 24)
             .map_err(|error| ServerError::Message(error.to_string()))?,
     );
     let state = AppState {
@@ -553,6 +553,14 @@ pub fn runtime_root() -> PathBuf {
         .and_then(|path| path.parent().map(PathBuf::from))
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn result_store_root() -> PathBuf {
+    if let Some(base_dir) = dirs::data_local_dir().or_else(dirs::data_dir) {
+        return base_dir.join("ShenYin").join("results");
+    }
+
+    runtime_root().join("data").join("results")
 }
 
 fn open_browser_later(url: String) {
