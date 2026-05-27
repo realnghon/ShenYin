@@ -80,7 +80,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          & "dist\foldbox-windows-x64.exe" --help | Out-Null
+          $help = & "dist\foldbox-windows-x64.exe" --help
+          if ($help -notmatch "Usage:") {
+            throw "Windows artifact did not print usage text."
+          }
 
       - name: Smoke test Linux artifact
         if: runner.os == 'Linux'
@@ -91,7 +94,8 @@ jobs:
           mkdir -p smoke
           tar -xzf dist/foldbox-linux-x64.tar.gz -C smoke
           chmod +x smoke/foldbox-linux-x64/foldbox
-          smoke/foldbox-linux-x64/foldbox --help >/dev/null
+          help_output="$(smoke/foldbox-linux-x64/foldbox --help)"
+          [[ "${help_output}" == *"Usage:"* ]]
 
       - name: Smoke test macOS artifact
         if: runner.os == 'macOS'
@@ -102,7 +106,8 @@ jobs:
           mkdir -p smoke
           tar -xzf dist/foldbox-macos-arm64.tar.gz -C smoke
           chmod +x smoke/foldbox-macos-arm64/foldbox
-          smoke/foldbox-macos-arm64/foldbox --help >/dev/null
+          help_output="$(smoke/foldbox-macos-arm64/foldbox --help)"
+          [[ "${help_output}" == *"Usage:"* ]]
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
