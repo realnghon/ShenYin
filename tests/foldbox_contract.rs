@@ -137,3 +137,17 @@ fn parse_cli_strips_wrapping_quotes_from_paths() {
         std::path::PathBuf::from("/tmp/out.box.txt")
     );
 }
+
+#[test]
+fn parse_cli_strips_invisible_characters_from_paths() {
+    let command = foldbox::app::parse_cli([
+        "pack".to_owned(),
+        "\u{feff}C:\\Users\\Han\\Downloads\\ohmydb.7z.txt.7z\u{200b}".to_owned(),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        command.input_path,
+        std::path::PathBuf::from(r"C:\Users\Han\Downloads\ohmydb.7z.txt.7z")
+    );
+}

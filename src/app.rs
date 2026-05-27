@@ -307,7 +307,8 @@ fn sanitized_output_name(input_name: &str) -> String {
 }
 
 fn cli_path_from_arg(raw: &str) -> PathBuf {
-    let trimmed = trim_matching_quotes(raw.trim());
+    let normalized = strip_invisible_path_chars(raw);
+    let trimmed = trim_matching_quotes(normalized.trim());
     let expanded = expand_home_prefix(trimmed);
     PathBuf::from(expanded)
 }
@@ -345,4 +346,21 @@ fn home_dir_string() -> Option<String> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(|value| PathBuf::from(value).to_string_lossy().into_owned())
+}
+
+fn strip_invisible_path_chars(raw: &str) -> String {
+    raw.chars()
+        .filter(|character| {
+            !matches!(
+                character,
+                '\u{200b}'
+                    | '\u{200c}'
+                    | '\u{200d}'
+                    | '\u{200e}'
+                    | '\u{200f}'
+                    | '\u{2060}'
+                    | '\u{feff}'
+            )
+        })
+        .collect()
 }
