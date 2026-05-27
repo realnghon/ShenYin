@@ -25,7 +25,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
 
     let command = app::parse_cli(args).map_err(|error| error.to_string())?;
     execute(command).map(|output_path| {
-        println!("已生成：{}", output_path.display());
+        println!("created: {}", output_path.display());
     })
 }
 
@@ -33,8 +33,8 @@ fn execute(command: CliCommand) -> Result<PathBuf, String> {
     match command.action {
         Action::Pack => {
             let passphrase =
-                rpassword::prompt_password("请输入口令: ").map_err(|error| error.to_string())?;
-            let confirm = rpassword::prompt_password("请再次输入口令: ")
+                rpassword::prompt_password("Enter passphrase: ").map_err(|error| error.to_string())?;
+            let confirm = rpassword::prompt_password("Confirm passphrase: ")
                 .map_err(|error| error.to_string())?;
             app::pack_file(
                 &command.input_path,
@@ -46,7 +46,7 @@ fn execute(command: CliCommand) -> Result<PathBuf, String> {
         }
         Action::Unpack => {
             let passphrase =
-                rpassword::prompt_password("请输入口令: ").map_err(|error| error.to_string())?;
+                rpassword::prompt_password("Enter passphrase: ").map_err(|error| error.to_string())?;
             app::unpack_file(
                 &command.input_path,
                 command.output_path.as_deref(),

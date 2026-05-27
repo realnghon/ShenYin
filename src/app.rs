@@ -45,23 +45,23 @@ pub enum Action {
 
 #[derive(Debug, Error)]
 pub enum FoldBoxError {
-    #[error("请输入命令。")]
+    #[error("missing command")]
     MissingCommand,
-    #[error("不支持的命令。")]
+    #[error("unsupported command")]
     UnknownCommand,
-    #[error("请提供输入文件路径。")]
+    #[error("missing input file path")]
     MissingInputPath,
-    #[error("口令不能为空。")]
+    #[error("passphrase cannot be empty")]
     EmptyPassphrase,
-    #[error("两次口令不一致。")]
+    #[error("passphrases do not match")]
     MismatchedPassphrase,
-    #[error("输入文件名无效。")]
+    #[error("invalid input file name")]
     InvalidInputName,
-    #[error("处理失败。")]
+    #[error("operation failed")]
     ProcessingFailed,
-    #[error("读取文件失败：{0}")]
+    #[error("failed to read file: {0}")]
     ReadFailed(String),
-    #[error("写入文件失败：{0}")]
+    #[error("failed to write file: {0}")]
     WriteFailed(String),
 }
 
@@ -127,10 +127,11 @@ pub fn unpack_text(encoded_text: &str, passphrase: &str) -> Result<UnpackResult,
 }
 
 pub fn default_pack_output_path(input_path: &Path) -> PathBuf {
+    let parent = input_path.parent().unwrap_or_else(|| Path::new("."));
     let file_name = input_path
         .file_name()
         .unwrap_or_else(|| OsStr::new("output.bin"));
-    input_path.with_file_name(format!("{}.box.txt", file_name.to_string_lossy()))
+    parent.join(format!("{}.box.txt", file_name.to_string_lossy()))
 }
 
 pub fn default_unpack_output_path(input_path: &Path, original_file_name: &str) -> PathBuf {

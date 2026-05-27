@@ -63,7 +63,7 @@ fn wrong_passphrase_returns_generic_failure() {
     .unwrap();
 
     let error = unpack_text(&encoded, "wrong").unwrap_err();
-    assert_eq!(error.to_string(), "处理失败。");
+    assert_eq!(error.to_string(), "operation failed");
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn pack_rejects_mismatched_confirmation() {
     })
     .unwrap_err();
 
-    assert_eq!(error.to_string(), "两次口令不一致。");
+    assert_eq!(error.to_string(), "passphrases do not match");
 }
 
 #[test]
@@ -92,4 +92,15 @@ fn default_unpack_output_restores_original_filename_in_same_directory() {
     let encoded_path = dir.path().join("demo.box.txt");
     let output_path = default_unpack_output_path(&encoded_path, "payload.bin");
     assert_eq!(output_path, dir.path().join("payload.bin"));
+}
+
+#[test]
+fn pack_file_with_absolute_path_creates_default_output_next_to_input() {
+    let dir = tempdir().unwrap();
+    let input_path = dir.path().join("ohmydb.7z.txt.7z");
+    std::fs::write(&input_path, b"hello").unwrap();
+
+    let output_path = foldbox::app::pack_file(&input_path, None, "secret", "secret").unwrap();
+    assert_eq!(output_path, dir.path().join("ohmydb.7z.txt.7z.box.txt"));
+    assert!(output_path.exists());
 }
