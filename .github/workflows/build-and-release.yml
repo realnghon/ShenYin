@@ -26,18 +26,18 @@ jobs:
           - label: Windows x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: ShenYin-windows-x64
-            artifact_path: dist/ShenYin-windows-x64.exe
+            artifact_name: foldbox-windows-x64
+            artifact_path: dist/foldbox-windows-x64.exe
           - label: Linux x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: ShenYin-linux-x64
-            artifact_path: dist/ShenYin-linux-x64.tar.gz
+            artifact_name: foldbox-linux-x64
+            artifact_path: dist/foldbox-linux-x64.tar.gz
           - label: macOS arm64
             os: macos-14
             target: aarch64-apple-darwin
-            artifact_name: ShenYin-macos-arm64
-            artifact_path: dist/ShenYin-macos-arm64.zip
+            artifact_name: foldbox-macos-arm64
+            artifact_path: dist/foldbox-macos-arm64.tar.gz
 
     steps:
       - name: Checkout
@@ -73,39 +73,14 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          chmod +x scripts/package-macos-app.sh
-          ./scripts/package-macos-app.sh '${{ matrix.target }}' release dist
+          chmod +x scripts/package-macos.sh
+          ./scripts/package-macos.sh '${{ matrix.target }}' release dist
 
       - name: Smoke test Windows artifact
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $proc = Start-Process -FilePath "dist\ShenYin-windows-x64.exe" -ArgumentList "--host","127.0.0.1","--port","19876","--no-browser" -PassThru -NoNewWindow
-          $passed = $false
-          try {
-            for ($i = 0; $i -lt 30; $i++) {
-              Start-Sleep -Seconds 1
-              try {
-                $resp = Invoke-WebRequest -Uri "http://127.0.0.1:19876/" -UseBasicParsing -TimeoutSec 5
-                if ($resp.StatusCode -eq 200) {
-                  Write-Host "Smoke test passed: HTTP 200"
-                  $passed = $true
-                  break
-                }
-              } catch {
-                if ($proc.HasExited) {
-                  throw "Packaged Windows app exited before responding."
-                }
-              }
-            }
-            if (-not $passed) {
-              throw "Timed out waiting for the Windows artifact to return HTTP 200."
-            }
-          } finally {
-            if (-not $proc.HasExited) {
-              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-            }
-          }
+          & "dist\foldbox-windows-x64.exe" --help | Out-Null
 
       - name: Smoke test Linux artifact
         if: runner.os == 'Linux'
@@ -114,28 +89,9 @@ jobs:
           set -euo pipefail
           rm -rf smoke
           mkdir -p smoke
-          tar -xzf dist/ShenYin-linux-x64.tar.gz -C smoke
-          chmod +x smoke/ShenYin-linux-x64/ShenYin
-          smoke/ShenYin-linux-x64/ShenYin --host 127.0.0.1 --port 19876 --no-browser &
-          app_pid=$!
-          cleanup() {
-            kill "$app_pid" >/dev/null 2>&1 || true
-            wait "$app_pid" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          for _ in $(seq 1 30); do
-            if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:19876/" >/dev/null; then
-              echo "Smoke test passed: HTTP 200"
-              exit 0
-            fi
-            if ! kill -0 "$app_pid" >/dev/null 2>&1; then
-              echo "Packaged Linux app exited before responding." >&2
-              exit 1
-            fi
-            sleep 1
-          done
-          echo "Timed out waiting for the Linux artifact to return HTTP 200." >&2
-          exit 1
+          tar -xzf dist/foldbox-linux-x64.tar.gz -C smoke
+          chmod +x smoke/foldbox-linux-x64/foldbox
+          smoke/foldbox-linux-x64/foldbox --help >/dev/null
 
       - name: Smoke test macOS artifact
         if: runner.os == 'macOS'
@@ -144,27 +100,9 @@ jobs:
           set -euo pipefail
           rm -rf smoke
           mkdir -p smoke
-          ditto -x -k dist/ShenYin-macos-arm64.zip smoke
-          smoke/ShenYin.app/Contents/MacOS/ShenYin --host 127.0.0.1 --port 19876 --no-browser &
-          app_pid=$!
-          cleanup() {
-            kill "$app_pid" >/dev/null 2>&1 || true
-            wait "$app_pid" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          for _ in $(seq 1 30); do
-            if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:19876/" >/dev/null; then
-              echo "Smoke test passed: HTTP 200"
-              exit 0
-            fi
-            if ! kill -0 "$app_pid" >/dev/null 2>&1; then
-              echo "Packaged macOS app exited before responding." >&2
-              exit 1
-            fi
-            sleep 1
-          done
-          echo "Timed out waiting for the macOS artifact to return HTTP 200." >&2
-          exit 1
+          tar -xzf dist/foldbox-macos-arm64.tar.gz -C smoke
+          chmod +x smoke/foldbox-macos-arm64/foldbox
+          smoke/foldbox-macos-arm64/foldbox --help >/dev/null
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
@@ -190,19 +128,19 @@ jobs:
       - name: Download Windows artifact
         uses: actions/download-artifact@v8
         with:
-          name: ShenYin-windows-x64
+          name: foldbox-windows-x64
           path: dist
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v8
         with:
-          name: ShenYin-linux-x64
+          name: foldbox-linux-x64
           path: dist
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v8
         with:
-          name: ShenYin-macos-arm64
+          name: foldbox-macos-arm64
           path: dist
 
       - name: Remove stale version assets
@@ -225,16 +163,15 @@ jobs:
           body: |
             ## Release ${{ github.ref_name }}
 
-            - Windows x64: `ShenYin-windows-x64.exe`
-            - Linux x64: `ShenYin-linux-x64.tar.gz`
-            - macOS arm64: `ShenYin-macos-arm64.zip`
-            - 文本与文件加密/解密功能已完整迁移到 Rust
-            - 保持与原版兼容的 AES-256-GCM + PBKDF2 + Base85 文本传输协议
-            - 关闭应用页面后会自动停止本地 API 服务，避免后台继续占用端口
-            - macOS release uses ad-hoc signing only and may still require a manual allow step on first launch
+            - Windows x64: `foldbox-windows-x64.exe`
+            - Linux x64: `foldbox-linux-x64.tar.gz`
+            - macOS arm64: `foldbox-macos-arm64.tar.gz`
+            - FoldBox 是一个纯 CLI 文件封装工具。
+            - `pack` 生成 `.box.txt` 文本文件，`unpack` 还原原始文件。
+            - 运行 `foldbox --help` 查看命令用法。
           overwrite_files: true
           make_latest: true
           files: |
-            dist/ShenYin-windows-x64.exe
-            dist/ShenYin-linux-x64.tar.gz
-            dist/ShenYin-macos-arm64.zip
+            dist/foldbox-windows-x64.exe
+            dist/foldbox-linux-x64.tar.gz
+            dist/foldbox-macos-arm64.tar.gz

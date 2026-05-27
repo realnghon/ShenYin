@@ -6,14 +6,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$binaryPath = Join-Path -Path "target" -ChildPath "$Target\$Profile\shenyin.exe"
+$binaryPath = Join-Path -Path "target" -ChildPath "$Target\$Profile\foldbox.exe"
 if (-not (Test-Path -LiteralPath $binaryPath)) {
     throw "Expected compiled Windows binary at '$binaryPath'."
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-$artifactPath = Join-Path -Path $OutputDir -ChildPath "ShenYin-windows-x64.exe"
+$artifactPath = Join-Path -Path $OutputDir -ChildPath "foldbox-windows-x64.exe"
 if (Test-Path -LiteralPath $artifactPath) {
     Remove-Item -LiteralPath $artifactPath -Force
 }
