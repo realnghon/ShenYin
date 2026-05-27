@@ -80,7 +80,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $help = & "dist\foldbox-windows-x64.exe" --help
+          $stdoutPath = Join-Path $PWD "windows-help.txt"
+          $stderrPath = Join-Path $PWD "windows-help.err.txt"
+          $process = Start-Process -FilePath "dist\foldbox-windows-x64.exe" -ArgumentList "--help" -NoNewWindow -PassThru -Wait -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+          if ($process.ExitCode -ne 0) {
+            $stderr = if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath -Raw } else { "" }
+            throw "Windows artifact exited with code $($process.ExitCode). $stderr"
+          }
+          $help = Get-Content -LiteralPath $stdoutPath -Raw
           if ($help -notmatch "Usage:") {
             throw "Windows artifact did not print usage text."
           }
