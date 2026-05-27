@@ -151,3 +151,17 @@ fn parse_cli_strips_invisible_characters_from_paths() {
         std::path::PathBuf::from(r"C:\Users\Han\Downloads\ohmydb.7z.txt.7z")
     );
 }
+
+#[test]
+fn parse_cli_strips_directional_format_characters_from_paths() {
+    let command = foldbox::app::parse_cli([
+        "pack".to_owned(),
+        "\u{202a}C:\\Users\\Han\\Downloads\\ohmydb.7z.txt.7z\u{202c}".to_owned(),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        command.input_path,
+        std::path::PathBuf::from(r"C:\Users\Han\Downloads\ohmydb.7z.txt.7z")
+    );
+}
