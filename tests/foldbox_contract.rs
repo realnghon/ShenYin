@@ -104,3 +104,36 @@ fn pack_file_with_absolute_path_creates_default_output_next_to_input() {
     assert_eq!(output_path, dir.path().join("ohmydb.7z.txt.7z.box.txt"));
     assert!(output_path.exists());
 }
+
+#[test]
+fn parse_cli_keeps_windows_absolute_path_intact() {
+    let command = foldbox::app::parse_cli([
+        "pack".to_owned(),
+        r"C:\Users\Han\Downloads\ohmydb.7z.txt.7z".to_owned(),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        command.input_path,
+        std::path::PathBuf::from(r"C:\Users\Han\Downloads\ohmydb.7z.txt.7z")
+    );
+}
+
+#[test]
+fn parse_cli_strips_wrapping_quotes_from_paths() {
+    let command = foldbox::app::parse_cli([
+        "pack".to_owned(),
+        "\"/tmp/demo file.7z\"".to_owned(),
+        "\"/tmp/out.box.txt\"".to_owned(),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        command.input_path,
+        std::path::PathBuf::from("/tmp/demo file.7z")
+    );
+    assert_eq!(
+        command.output_path.unwrap(),
+        std::path::PathBuf::from("/tmp/out.box.txt")
+    );
+}

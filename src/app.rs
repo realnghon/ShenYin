@@ -161,9 +161,9 @@ pub fn parse_cli(args: impl IntoIterator<Item = String>) -> Result<CliCommand, F
 
     let input_path = args
         .next()
-        .map(PathBuf::from)
+        .map(|value| cli_path_from_arg(&value))
         .ok_or(FoldBoxError::MissingInputPath)?;
-    let output_path = args.next().map(PathBuf::from);
+    let output_path = args.next().map(|value| cli_path_from_arg(&value));
     if args.next().is_some() {
         return Err(FoldBoxError::UnknownCommand);
     }
@@ -304,4 +304,45 @@ fn sanitized_output_name(input_name: &str) -> String {
     } else {
         cleaned
     }
+}
+
+fn cli_path_from_arg(raw: &str) -> PathBuf {
+    let trimmed = trim_matching_quotes(raw.trim());
+    let expanded = expand_home_prefix(trimmed);
+    PathBuf::from(expanded)
+}
+
+fn trim_matching_quotes(value: &str) -> &str {
+    if value.len() >= 2 {
+        let first = value.as_bytes()[0];
+        let last = value.as_bytes()[value.len() - 1];
+        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+            return &value[1..value.len() - 1];
+        }
+    }
+
+    value
+}
+
+fn expand_home_prefix(value: &str) -> String {
+    if value == "~" {
+        return home_dir_string().unwrap_or_else(|| value.to_owned());
+    }
+
+    if let Some(remainder) = value.strip_prefix("~/").or_else(|| value.strip_prefix("~\\")) {
+        if let Some(home_dir) = home_dir_string() {
+            return PathBuf::from(home_dir)
+                .join(remainder)
+                .to_string_lossy()
+                .into_owned();
+        }
+    }
+
+    value.to_owned()
+}
+
+fn home_dir_string() -> Option<String> {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(|value| PathBuf::from(value).to_string_lossy().into_owned())
 }
